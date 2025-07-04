@@ -16,7 +16,8 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Stores memory per user session
+# Stores memory per user sessiongit add .
+
 user_sessions = {}
 
 app.secret_key = '123456'  # Make sure this is strong in production
