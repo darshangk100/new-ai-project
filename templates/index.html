@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Chat with AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .chat-header {
+      background: linear-gradient(135deg, #3b82f6, #06b6d4);
+    }
+  </style>
+</head>
+<body class="bg-gray-100">
+
+  <!-- Floating Chat Button -->
+  <div id="chatButton" class="fixed bottom-6 right-6 z-50">
+    <button onclick="toggleChat()" class="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-full shadow-lg">
+      <img src="https://cdn-icons-png.flaticon.com/512/4712/4712100.png" alt="Robot" class="w-8 h-8" />
+      <span class="font-semibold hidden sm:inline">Chat with us</span>
+    </button>
+  </div>
+
+  <!-- Chat Window -->
+  <div id="chatWindow"
+    class="fixed bottom-20 right-2 sm:right-6 w-[98vw] max-w-full sm:w-[420px] h-[80vh] sm:h-[600px] bg-white rounded-xl shadow-xl border border-gray-300 flex flex-col hidden z-50">
+
+    <!-- Header -->
+    <div class="chat-header p-3 sm:p-4 text-white flex items-center rounded-t-xl space-x-3">
+      <img src="https://cdn-icons-png.flaticon.com/512/4712/4712100.png" class="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-white" alt="Bot" />
+      <div>
+        <div class="text-base sm:text-lg font-bold">Chat with AI</div>
+        <div class="text-xs sm:text-sm">We are online!</div>
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div id="messages" class="flex-1 overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 bg-gray-50 text-sm sm:text-base">
+      <div class="flex items-start space-x-2">
+        <img src="https://cdn-icons-png.flaticon.com/512/4712/4712100.png" class="w-5 h-5 sm:w-6 sm:h-6" />
+        <div class="bg-white p-2 sm:p-2  rounded-xl shadow max-w-[75%]">
+          Hello! How can I help you?
+        </div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="flex items-center border-t p-2 sm:p-3">
+      <input id="userInput" type="text" placeholder="Enter your message..." class="flex-1 px-2 py-2 sm:px-3 border rounded-lg focus:outline-none text-sm sm:text-base" />
+      <button onclick="sendMessage()" class="ml-2 w-10 h-10 sm:w-12 sm:h-12 bg-blue-500 rounded-full flex items-center justify-center hover:bg-blue-600">
+        <!-- Professional send icon (arrow L style) -->
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    function toggleChat() {
+      document.getElementById('chatWindow').classList.toggle('hidden');
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('userInput');
+      const message = input.value.trim();
+      if (!message) return;
+
+      const messages = document.getElementById('messages');
+
+      const userMsg = document.createElement('div');
+      userMsg.className = "flex items-start justify-end space-x-2";
+      userMsg.innerHTML = `
+        <div class="bg-blue-100 p-2 sm:p-3 rounded-xl shadow max-w-[75%]">${message}</div>
+        <img src="https://cdn-icons-png.flaticon.com/512/921/921347.png" class="w-5 h-5 sm:w-6 sm:h-6" />
+      `;
+      messages.appendChild(userMsg);
+      messages.scrollTop = messages.scrollHeight;
+
+      input.value = "";
+
+      try {
+        const response = await fetch('/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: message })
+        });
+
+        const data = await response.json();
+        const botReply = data.answer;
+
+        const botMsg = document.createElement('div');
+        botMsg.className = "flex items-start space-x-2";
+        botMsg.innerHTML = `
+          <img src="https://cdn-icons-png.flaticon.com/512/4712/4712100.png" class="w-5 h-5 sm:w-6 sm:h-6" />
+          <div class="bg-white p-2 sm:p-3 rounded-xl shadow max-w-[75%]">${botReply}</div>
+        `;
+        messages.appendChild(botMsg);
+        messages.scrollTop = messages.scrollHeight;
+
+      } catch (error) {
+        const errorMsg = document.createElement('div');
+        errorMsg.className = "flex items-start space-x-2";
+        errorMsg.innerHTML = `
+          <img src="https://cdn-icons-png.flaticon.com/512/4712/4712100.png" class="w-5 h-5 sm:w-6 sm:h-6" />
+          <div class="bg-white p-2 sm:p-3 rounded-xl shadow max-w-[75%] text-red-500">Error: Could not reach server.</div>
+        `;
+        messages.appendChild(errorMsg);
+        messages.scrollTop = messages.scrollHeight;
+      }
+    }
+
+    // Send message on Enter key
+    document.addEventListener("DOMContentLoaded", function () {
+      const input = document.getElementById("userInput");
+      input.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          sendMessage();
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>
