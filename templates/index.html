@@ -163,6 +163,8 @@
           return;
         }
 
+        // Reset upload icon and border
+        uploadButton.classList.remove("uploaded-success");
         uploadIcon.textContent = "⏳";
 
         const formData = new FormData();

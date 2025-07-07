@@ -9,6 +9,8 @@ from flask import render_template
 from flask import Flask, request, jsonify, render_template, session
 from flask_session import Session
 import uuid
+import tempfile
+
 
 
 # Load environment variables
@@ -49,6 +51,44 @@ def get_embedding(text):
     )
     return response['embedding']
 
+# @app.route('/upload', methods=['POST'])
+# def upload_pdf():
+#     if 'file' not in request.files:
+#         return jsonify({"error": "No file part in the request"}), 400
+
+#     file = request.files['file']
+
+#     if file.filename == '':
+#         return jsonify({"error": "No selected file"}), 400
+
+#     #  Check if uploaded file is a PDF
+#     if not file.filename.lower().endswith('.pdf'):
+#         return jsonify({"error": " Invalid file type. Please upload a PDF file only."}), 400
+
+#     # Optional: You can also check MIME type (extra safety)
+#     if file.mimetype != 'application/pdf':
+#         return jsonify({"error": " File type not supported. Only PDFs are allowed."}), 400
+
+#     # Save file
+#     file_path = os.path.join('uploads', file.filename)
+#     file.save(file_path)
+
+#     # Extract text and process
+#     text = extract_text(file_path)
+#     chunks = splitter.split_text(text)
+#     print(f"Extracted {len(chunks)} chunks from the PDF.")
+
+#     for chunk in chunks:
+#         print(f"{chunk}")
+#         embedding = get_embedding(chunk)
+#         supabase.table("documents").insert({
+#             "chunk": chunk,
+#             "embedding": embedding
+#         }).execute()
+
+#     return jsonify({"status": " File uploaded and data embedded successfully!"})
+
+
 @app.route('/upload', methods=['POST'])
 def upload_pdf():
     if 'file' not in request.files:
@@ -59,32 +99,48 @@ def upload_pdf():
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
 
-    #  Check if uploaded file is a PDF
-    if not file.filename.lower().endswith('.pdf'):
-        return jsonify({"error": " Invalid file type. Please upload a PDF file only."}), 400
+    if not file.filename.lower().endswith('.pdf') or file.mimetype != 'application/pdf':
+        return jsonify({"error": "Please upload a valid PDF file only."}), 400
 
-    # Optional: You can also check MIME type (extra safety)
-    if file.mimetype != 'application/pdf':
-        return jsonify({"error": " File type not supported. Only PDFs are allowed."}), 400
+    try:
+        temp_path = os.path.join(tempfile.gettempdir(), file.filename)
+        file.save(temp_path)
 
-    # Save file
-    file_path = os.path.join('uploads', file.filename)
-    file.save(file_path)
+        # Upload to Supabase storage
+        file_key = f"{uuid.uuid4()}_{file.filename}"
+        with open(temp_path, "rb") as f:
+            storage_response = supabase.storage.from_("pdfs").upload(
+            path=file_key,
+            file=f,
+            file_options={"content-type": "application/pdf"}
+        )
 
-    # Extract text and process
-    text = extract_text(file_path)
-    chunks = splitter.split_text(text)
-    print(f"Extracted {len(chunks)} chunks from the PDF.")
+        #  Check for successful upload using .status_code
+        if storage_response.status_code != 200:
+            return jsonify({
+                "error": f"Failed to upload to Supabase storage: {storage_response.text}"
+            }), 500
 
-    for chunk in chunks:
-        print(f"{chunk}")
-        embedding = get_embedding(chunk)
-        supabase.table("documents").insert({
-            "chunk": chunk,
-            "embedding": embedding
-        }).execute()
 
-    return jsonify({"status": " File uploaded and data embedded successfully!"})
+        # Continue processing PDF text
+        text = extract_text(temp_path)
+        chunks = splitter.split_text(text)
+
+        for chunk in chunks:
+            embedding = get_embedding(chunk)
+            supabase.table("documents").insert({
+                "chunk": chunk,
+                "embedding": embedding
+            }).execute()
+
+        return jsonify({"status": "PDF uploaded and embedded successfully!"})
+
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({"error": f"Upload failed: {str(e)}"}), 500
+
+
 
 
 
