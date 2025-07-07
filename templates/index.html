@@ -9,6 +9,10 @@
     .chat-header {
       background: linear-gradient(135deg, #3b82f6, #06b6d4);
     }
+    .uploaded-success {
+      border-color: #22c55e !important; /* green-500 */
+      background-color: #dcfce7 !important; /* green-100 */
+    }
   </style>
 </head>
 <body class="bg-gray-100">
@@ -38,17 +42,27 @@
     <div id="messages" class="flex-1 overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 bg-gray-50 text-sm sm:text-base">
       <div class="flex items-start space-x-2">
         <img src="https://cdn-icons-png.flaticon.com/512/4712/4712100.png" class="w-5 h-5 sm:w-6 sm:h-6" />
-        <div class="bg-white p-2 sm:p-2  rounded-xl shadow max-w-[75%]">
+        <div class="bg-white p-2 sm:p-2 rounded-xl shadow max-w-[75%]">
           Hello! How can I help you?
         </div>
       </div>
     </div>
 
-    <!-- Input -->
-    <div class="flex items-center border-t p-2 sm:p-3">
+    <!-- Input and Upload -->
+    <div class="flex items-center border-t p-2 sm:p-3 space-x-2">
+      
+      <!-- Upload Button -->
+      <label for="pdfInput" id="uploadButton"
+        class="cursor-pointer flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 border-2 border-gray-300 rounded-full transition-all duration-300">
+        <span id="uploadIcon" class="text-xl font-bold text-gray-700">+</span>
+      </label>
+      <input type="file" id="pdfInput" accept="application/pdf" class="hidden" />
+
+      <!-- Message Input -->
       <input id="userInput" type="text" placeholder="Enter your message..." class="flex-1 px-2 py-2 sm:px-3 border rounded-lg focus:outline-none text-sm sm:text-base" />
-      <button onclick="sendMessage()" class="ml-2 w-10 h-10 sm:w-12 sm:h-12 bg-blue-500 rounded-full flex items-center justify-center hover:bg-blue-600">
-        <!-- Professional send icon (arrow L style) -->
+
+      <!-- Send Button -->
+      <button onclick="sendMessage()" class="w-10 h-10 sm:w-12 sm:h-12 bg-blue-500 rounded-full flex items-center justify-center hover:bg-blue-600">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
         </svg>
@@ -64,9 +78,20 @@
     async function sendMessage() {
       const input = document.getElementById('userInput');
       const message = input.value.trim();
-      if (!message) return;
-
       const messages = document.getElementById('messages');
+      input.classList.remove("border-red-500");
+
+      if (!message) {
+        input.classList.add("border-red-500");
+        const errorMsg = document.createElement('div');
+        errorMsg.className = "text-red-500 text-xs mb-2";
+        errorMsg.innerText = "Please enter a message before sending.";
+        messages.appendChild(errorMsg);
+        messages.scrollTop = messages.scrollHeight;
+        return;
+      }
+
+      input.disabled = true;
 
       const userMsg = document.createElement('div');
       userMsg.className = "flex items-start justify-end space-x-2";
@@ -76,7 +101,6 @@
       `;
       messages.appendChild(userMsg);
       messages.scrollTop = messages.scrollHeight;
-
       input.value = "";
 
       try {
@@ -87,7 +111,7 @@
         });
 
         const data = await response.json();
-        const botReply = data.answer;
+        const botReply = data.answer || "Sorry, no answer received.";
 
         const botMsg = document.createElement('div');
         botMsg.className = "flex items-start space-x-2";
@@ -103,21 +127,75 @@
         errorMsg.className = "flex items-start space-x-2";
         errorMsg.innerHTML = `
           <img src="https://cdn-icons-png.flaticon.com/512/4712/4712100.png" class="w-5 h-5 sm:w-6 sm:h-6" />
-          <div class="bg-white p-2 sm:p-3 rounded-xl shadow max-w-[75%] text-red-500">Error: Could not reach server.</div>
+          <div class="bg-white p-2 sm:p-3 rounded-xl shadow max-w-[75%] text-red-500">
+            Error: Could not reach server. Please try again later.
+          </div>
         `;
         messages.appendChild(errorMsg);
         messages.scrollTop = messages.scrollHeight;
       }
+
+      input.disabled = false;
+      input.focus();
     }
 
-    // Send message on Enter key
     document.addEventListener("DOMContentLoaded", function () {
       const input = document.getElementById("userInput");
+      const fileInput = document.getElementById("pdfInput");
+      const uploadButton = document.getElementById("uploadButton");
+      const uploadIcon = document.getElementById("uploadIcon");
+
       input.addEventListener("keydown", function (event) {
         if (event.key === "Enter") {
           event.preventDefault();
           sendMessage();
         }
+      });
+
+      fileInput.addEventListener("change", async function () {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        if (file.type !== "application/pdf") {
+          alert("❌ Please upload a PDF file.");
+          fileInput.value = "";
+          return;
+        }
+
+        uploadIcon.textContent = "⏳";
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+          const response = await fetch("/upload", {
+            method: "POST",
+            body: formData
+          });
+
+          const data = await response.json();
+
+          if (data.status) {
+            // alert(data.status);
+            uploadButton.classList.add("uploaded-success");
+            uploadIcon.textContent = "✔";
+
+            setTimeout(() => {
+              uploadButton.classList.remove("uploaded-success");
+              uploadIcon.textContent = "+";
+            }, 3000);
+          } else {
+            throw new Error("Upload failed");
+          }
+
+        } catch (error) {
+          alert("❌ Failed to upload PDF.");
+          console.error(error);
+          uploadIcon.textContent = "+";
+          uploadButton.classList.remove("uploaded-success");
+        }
+
+        fileInput.value = "";
       });
     });
   </script>
